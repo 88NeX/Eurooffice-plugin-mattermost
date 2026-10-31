@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html>
+
+<head runat="server">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <!--
+    *
+    * (c) Copyright Ascensio System SIA 2026
+    *
+    * Licensed under the Apache License, Version 2.0 (the "License");
+    * you may not use this file except in compliance with the License.
+    * You may obtain a copy of the License at
+    *
+    *     http://www.apache.org/licenses/LICENSE-2.0
+    *
+    * Unless required by applicable law or agreed to in writing, software
+    * distributed under the License is distributed on an "AS IS" BASIS,
+    * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    * See the License for the specific language governing permissions and
+    * limitations under the License.
+    *
+    -->
+    <title>EuroOffice</title>
+    <script>
+      var isDark = {{if .dark}}true{{else}}false{{end}};
+      document.addEventListener('DOMContentLoaded', function() {
+        if (isDark) {
+          document.body.style.background = '#1b1d22';
+        } else {
+          document.body.style.background = '#fff';
+        }
+      });
+    </script>
+    <style>
+        body {
+            color: #333;
+            font-family: Arial, Tahoma, sans-serif;
+            font-size: 12px;
+            font-weight: normal;
+            height: 100%;
+            margin: 0;
+            overflow-y: hidden;
+            padding: 0;
+            text-decoration: none;
+        }
+
+        .form {
+            height: 100%;
+            visibility: hidden;
+        }
+
+        .form_visible {
+            visibility: visible;
+        }
+
+        div {
+            margin: 0;
+            padding: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="form">
+        <div id="iframeEditor">
+        </div>
+    </div>
+    <script type="text/javascript" src="{{.apijs}}"></script>
+    <script type="text/javascript" language="javascript">
+        const EuroOffice_CLOSE_EVENT = new Event('onlyofficecloseeditor');
+        const EuroOffice_READY_EVENT = new Event('onlyofficeready');
+        const EuroOffice_ERROR_EVENT = new Event('onlyofficeerror');
+
+        var docEditor;
+        var mentionsAuthCode = "{{.mentionscode}}";
+
+        var innerAlert = function (message) {
+            if (console && console.log)
+                console.log(message);
+        };
+
+        var onAppReady = function () {
+            innerAlert("Document editor ready");
+            const form = document.getElementsByClassName('form').item(0);
+            if (form) {
+                window.parent.dispatchEvent(EuroOffice_READY_EVENT);
+                form.classList.add('form_visible');
+            }
+        };
+
+        var onRequestClose = function () {
+            if (window.opener) {
+                window.close();
+                return;
+            }
+            window.parent.dispatchEvent(EuroOffice_CLOSE_EVENT);
+            docEditor.destroyEditor();
+        };
+
+        var replaceActionLink = function (href, linkParam) {
+            var link;
+            var actionIndex = href.indexOf("&action=");
+            if (actionIndex != -1) {
+                var endIndex = href.indexOf("&", actionIndex + "&action=".length);
+                if (endIndex != -1) {
+                    link = href.substring(0, actionIndex) + href.substring(endIndex) + "&action=" + encodeURIComponent(linkParam);
+                } else {
+                    link = href.substring(0, actionIndex) + "&action=" + encodeURIComponent(linkParam);
+                }
+            } else {
+                link = href + "&action=" + encodeURIComponent(linkParam);
+            }
+            return link;
+        }
+
+        var onError = function (event) {
+            if (event) innerAlert(event.data);
+        };
+
+        var onRequestRefreshFile = function () {
+            const urlParams = new URLSearchParams(window.location.search);
+            const fileId = urlParams.get('file');
+            const lang = urlParams.get('lang') || 'en';
+            const dark = urlParams.get('dark') || 'false';
+
+            fetch('/plugins/88nex.eurooffice/api/editor/config?file=' + fileId + '&lang=' + lang + '&dark=' + dark, {
+                method: 'GET',
+                credentials: 'include'
+            })
+            .then((response) => {
+                if (!response.ok) {
+                    window.parent.dispatchEvent(EuroOffice_CLOSE_EVENT);
+                    return;
+                }
+                
+                return response.json();
+            })
+            .then((config) => {
+                if (config) {
+                    docEditor.refreshFile(config);
+                }
+            })
+            .catch((error) => {
+                window.parent.dispatchEvent(EuroOffice_CLOSE_EVENT);
+            });
+        };
+
+        var onRequestUsers = function (event) {
+            if (event && event.data) {
+                var c = event.data.c;
+                const urlParams = new URLSearchParams(window.location.search);
+                const fileId = urlParams.get('file');
+                
+                if (!fileId) {
+                    return;
+                }
+
+                if (!mentionsAuthCode) {
+                    return;
+                }
+
+                var allUsers = [];
+                var currentFrom = 0;
+                var requestedCount = 10;
+                var search = event.data.search || '';
+                
+                function fetchPage(from) {
+                    var queryParams = 'file=' + fileId + '&code=' + mentionsAuthCode + '&c=' + c;
+                    queryParams += '&from=' + from;
+                    queryParams += '&count=' + requestedCount;
+                    if (search) {
+                        queryParams += '&search=' + encodeURIComponent(search);
+                    }
+
+                    return fetch('/plugins/88nex.eurooffice/api/mentions/users?' + queryParams, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        credentials: 'include'
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            return response.json().then(err => {
+                                throw new Error(err.error || 'Request failed with status ' + response.status);
+                            });
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.users && data.users.length > 0) {
+                            allUsers = allUsers.concat(data.users);
+                        }
+                        
+                        if (data.hasMore) {
+                            return fetchPage(from + requestedCount);
+                        } else {
+                            var result = {
+                                c: c,
+                                users: allUsers
+                            };
+                            
+                            docEditor.setUsers(result);
+                        }
+                    });
+                }
+                
+                fetchPage(0).catch(error => {
+                    innerAlert("Error loading users: " + error.message);
+                });
+            }
+        };
+
+        var onRequestSendNotify = function (event) {
+            if (event && event.data) {
+                const urlParams = new URLSearchParams(window.location.search);
+                const fileId = urlParams.get('file');
+                
+                if (!fileId) {
+                    return;
+                }
+
+                if (!mentionsAuthCode) {
+                    return;
+                }
+
+                const payload = {
+                    fileId: fileId,
+                    emails: event.data.emails || [],
+                    message: event.data.message || "",
+                    actionLink: event.data.actionLink || ""
+                };
+
+                fetch('/plugins/88nex.eurooffice/api/mentions/notify?code=' + mentionsAuthCode, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify(payload)
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => {
+                            throw new Error(err.error || 'Request failed with status ' + response.status);
+                        });
+                    }
+                    return response.json();
+                })
+                .catch(error => {
+                    innerAlert("Error sending notifications: " + error.message);
+                });
+            }
+        };
+
+        var events = {
+            "onAppReady": onAppReady,
+            "onRequestClose": onRequestClose,
+            "onError": onError,
+            "onRequestRefreshFile": onRequestRefreshFile,
+            "onRequestUsers": onRequestUsers,
+            "onRequestSendNotify": onRequestSendNotify,
+        };
+
+        var config = {{ .config }};
+        config["events"] = events;
+
+        var connectEditor = function () {
+            try {
+                docEditor = new DocsAPI.DocEditor("iframeEditor", config);
+                fixSize();
+            } catch {
+                innerAlert('[EuroOffice Error]: could not initialize DocsAPI instance');
+                window.parent.dispatchEvent(EuroOffice_ERROR_EVENT);
+            }
+        };
+
+        var fixSize = function () {
+            var wrapEl = document.getElementsByClassName("form");
+            if (wrapEl.length) {
+                wrapEl[0].style.height = screen.availHeight + "px";
+                window.scrollTo(0, -1);
+                wrapEl[0].style.height = window.innerHeight + "px";
+            }
+        };
+
+        if (window.addEventListener) {
+            window.addEventListener("load", connectEditor);
+            window.addEventListener("resize", fixSize);
+        } else if (window.attachEvent) {
+            window.attachEvent("onload", connectEditor);
+            window.attachEvent("onresize", fixSize);
+        }
+    </script>
+</body>
+
+</html>

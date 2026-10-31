@@ -1,0 +1,338 @@
+/**
+ *
+ * (c) Copyright Ascensio System SIA 2026
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+package configuration
+
+import (
+	"fmt"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/mattermost/mattermost/server/public/plugin"
+
+	"github.com/ONLYOFFICE/onlyoffice-mattermost/public"
+	"github.com/ONLYOFFICE/onlyoffice-mattermost/server/pkg/common"
+	"github.com/ONLYOFFICE/onlyoffice-mattermost/server/tools"
+)
+
+// Configuration captures the plugin's external configuration as exposed in the Mattermost server
+// configuration, as well as values computed from the configuration. Any public fields will be
+// deserialized from the Mattermost server configuration in OnConfigurationChange.
+//
+// As plugins are inherently concurrent (hooks being called asynchronously), and the plugin
+// configuration can change at any time, access to the configuration must be synchronized. The
+// strategy used in this plugin is to guard a pointer to the configuration, and clone the entire
+// struct whenever it changes. You may replace this with whatever strategy you choose.
+//
+// If you add non-reference types to your configuration struct, be sure to rewrite Clone as a deep
+// copy appropriate for your types.
+type Configuration struct {
+	DESAddress                 string `json:"desaddress"`
+	DESJwt                     string `json:"desjwt"`
+	DESJwtHeader               string `json:"desjwtheader"`
+	DESJwtPrefix               string `json:"desjwtprefix"`
+	DESAllowPrivate            bool `json:"desallowprivate"`
+	DemoEnabled                bool `json:"demoenabled"`
+	DemoExpires                int64 `json:"demoexpires"`
+	DemoAddress                string `json:"demoaddress"`
+	DemoHeader                 string `json:"demoheader"`
+	DemoPrefix                 string `json:"demoprefix"`
+	DemoSecret                 string `json:"demosecret"`
+	Formats                    string `json:"formats"`
+	OwnerProtected             bool `json:"ownerprotected"`
+	PluginsEnabled             bool `json:"pluginsenabled"`
+	MacrosEnabled              bool `json:"macrosenabled"`
+	HealthNotificationsEnabled bool `json:"healthnotificationsenabled"`
+	Error                      error
+}
+
+var loadFormats = sync.OnceValues(func() (map[string]public.Format, error) {
+	formatManager, err := public.NewMapFormatManager()
+	if err != nil {
+		return nil, err
+	}
+
+	return formatManager.GetAllFormats(), nil
+})
+
+// Removes deprecated formats from the selection and returns the dropped names
+func reconcileFormats(formats string) (string, []string) {
+	formats = strings.TrimSpace(formats)
+	if formats == "" || strings.EqualFold(formats, EmptyFormats) {
+		return formats, nil
+	}
+
+	allFormats, err := loadFormats()
+	if err != nil {
+		return formats, nil
+	}
+
+	known := make([]string, 0)
+	dropped := make([]string, 0)
+	for _, name := range strings.Split(formats, ",") {
+		formatName := strings.TrimSpace(strings.ToLower(name))
+		if formatName == "" {
+			continue
+		}
+
+		if _, exists := allFormats[formatName]; exists {
+			known = append(known, formatName)
+		} else {
+			dropped = append(dropped, formatName)
+		}
+	}
+
+	if len(known) == 0 {
+		return EmptyFormats, dropped
+	}
+
+	return strings.Join(known, ", "), dropped
+}
+
+// Clone shallow copies the configuration. Your implementation may require a deep copy if
+// your configuration has reference types.
+func (c *Configuration) Clone() *Configuration {
+	return &Configuration{
+		DESAddress:                 c.DESAddress,
+		DESJwt:                     c.DESJwt,
+		DESJwtHeader:               c.DESJwtHeader,
+		DESJwtPrefix:               c.DESJwtPrefix,
+		DESAllowPrivate:            c.DESAllowPrivate,
+		DemoEnabled:                c.DemoEnabled,
+		DemoExpires:                c.DemoExpires,
+		DemoAddress:                c.DemoAddress,
+		DemoHeader:                 c.DemoHeader,
+		DemoPrefix:                 c.DemoPrefix,
+		DemoSecret:                 c.DemoSecret,
+		Formats:                    c.Formats,
+		OwnerProtected:             c.OwnerProtected,
+		PluginsEnabled:             c.PluginsEnabled,
+		MacrosEnabled:              c.MacrosEnabled,
+		HealthNotificationsEnabled: c.HealthNotificationsEnabled,
+	}
+}
+
+// SanitizeConfiguration normalizes the settings and returns the formats dropped from the
+// selection because they are unknown (removed upstream or mistyped).
+func (c *Configuration) SanitizeConfiguration() []string {
+	c.DESAddress = strings.TrimSpace(c.DESAddress)
+	c.DESJwt = strings.TrimSpace(c.DESJwt)
+	c.DESJwtHeader = strings.TrimSpace(c.DESJwtHeader)
+	c.DESJwtPrefix = strings.TrimSpace(c.DESJwtPrefix)
+
+	var dropped []string
+	c.Formats, dropped = reconcileFormats(c.Formats)
+
+	if sanitized, err := tools.SanitizeURL(c.DESAddress); err == nil {
+		c.DESAddress = sanitized
+	}
+
+	c.DemoAddress = "https://onlinedocs.docs.onlyoffice.com"
+	c.DemoHeader = "AuthorizationJWT"
+	c.DemoPrefix = "Bearer "
+	c.DemoSecret = "sn2puSUF7muF5Jas"
+
+	if !c.DemoEnabled || c.DemoExpires <= time.Now().UnixMilli() {
+		if strings.EqualFold(c.DESAddress, c.DemoAddress) {
+			c.DESAddress = ""
+			c.DESJwt = ""
+			c.DESJwtHeader = ""
+			c.DESJwtPrefix = ""
+		}
+	}
+
+	return dropped
+}
+
+func (c *Configuration) HandleDemoConfiguration(api plugin.API) {
+	if !c.DemoEnabled {
+		return
+	}
+
+	now := time.Now().UnixMilli()
+	start, kvErr := api.KVGet(DemoKey)
+	if kvErr != nil || len(start) == 0 {
+		if err := api.KVSet(DemoKey, []byte(strconv.FormatInt(now, 10))); err == nil {
+			c.DemoExpires = now + _DemoPeriodMillis
+		}
+
+		start = []byte(strconv.FormatInt(now, 10))
+	}
+
+	startTime, parseErr := strconv.ParseInt(string(start), 10, 64)
+	if parseErr != nil {
+		if err := api.KVSet(DemoKey, []byte(strconv.FormatInt(now, 10))); err == nil {
+			c.DemoExpires = now + _DemoPeriodMillis
+		}
+
+		startTime = now
+	}
+
+	expirationTime := startTime + _DemoPeriodMillis
+	c.DemoExpires = expirationTime
+	if now <= expirationTime {
+		c.DESAddress = c.DemoAddress
+		c.DESJwt = c.DemoSecret
+		c.DESJwtHeader = c.DemoHeader
+		c.DESJwtPrefix = c.DemoPrefix
+	} else if strings.EqualFold(c.DESAddress, c.DemoAddress) {
+		c.DESAddress = ""
+		c.DESJwt = ""
+		c.DESJwtHeader = ""
+		c.DESJwtPrefix = ""
+	}
+}
+
+func (c *Configuration) validateFormats() error {
+	if c.Formats == "" {
+		return nil
+	}
+
+	if strings.ToLower(strings.TrimSpace(c.Formats)) == EmptyFormats {
+		return nil
+	}
+
+	allFormats, err := loadFormats()
+	if err != nil {
+		return &common.BadConfigurationError{
+			Property: "Format Configuration",
+			Reason:   "Failed to load formats: " + err.Error(),
+		}
+	}
+
+	for _, name := range strings.Split(c.Formats, ",") {
+		formatName := strings.TrimSpace(strings.ToLower(name))
+		if formatName == "" {
+			continue
+		}
+
+		format, exists := allFormats[formatName]
+		if !exists {
+			return &common.BadConfigurationError{
+				Property: "Formats",
+				Reason:   fmt.Sprintf("Invalid format: %s", formatName),
+			}
+		}
+
+		if !format.IsViewable() && !format.IsEditable() && !format.IsLossyEditable() && !format.IsAutoConvertable() {
+			return &common.BadConfigurationError{
+				Property: "Formats",
+				Reason:   fmt.Sprintf("Format does not support viewing or editing: %s", formatName),
+			}
+		}
+	}
+
+	return nil
+}
+
+func (c *Configuration) IsFormatAllowedForViewing(format string) bool {
+	if c.Formats == "" {
+		return true
+	}
+
+	if strings.ToLower(strings.TrimSpace(c.Formats)) == EmptyFormats {
+		return false
+	}
+
+	formatLower := strings.ToLower(strings.TrimSpace(format))
+	for _, name := range strings.Split(c.Formats, ",") {
+		if strings.ToLower(strings.TrimSpace(name)) == formatLower {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (c *Configuration) IsFormatAllowedForEditing(format string) bool {
+	if c.Formats == "" {
+		return true
+	}
+
+	if strings.ToLower(strings.TrimSpace(c.Formats)) == EmptyFormats {
+		return false
+	}
+
+	formatLower := strings.ToLower(strings.TrimSpace(format))
+	for _, name := range strings.Split(c.Formats, ",") {
+		if strings.ToLower(strings.TrimSpace(name)) == formatLower {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (c *Configuration) IsValid() error {
+	demoActive := c.DemoEnabled && c.DemoExpires > time.Now().UnixMilli()
+	hasCredentials := c.DESAddress != "" && c.DESJwt != "" && c.DESJwtHeader != "" && c.DESJwtPrefix != ""
+
+	if demoActive {
+		return nil
+	}
+
+	if c.DemoEnabled {
+		if !hasCredentials {
+			return &common.BadConfigurationError{
+				Property: "Document Server Configuration",
+				Reason:   "Demo mode has expired and no valid credentials provided",
+			}
+		}
+	}
+
+	if !hasCredentials {
+		return &common.BadConfigurationError{
+			Property: "Document Server Configuration",
+			Reason:   "No valid credentials provided and demo mode is not active",
+		}
+	}
+
+	if err := tools.IsValidURL(c.DESAddress); err != nil {
+		return &common.InvalidDocumentServerAddressError{
+			Reason: "Invalid Document Server address",
+		}
+	}
+
+	if c.DESJwt == "" {
+		return &common.BadConfigurationError{
+			Property: "Document Server Secret",
+			Reason:   "Please specify document server secret",
+		}
+	}
+
+	if c.DESJwtPrefix == "" {
+		return &common.BadConfigurationError{
+			Property: "Document Server Prefix",
+			Reason:   "Please specify document server prefix",
+		}
+	}
+
+	if c.DESJwtHeader == "" || strings.TrimSpace(c.DESJwtHeader) == "Authorization" {
+		return &common.BadConfigurationError{
+			Property: "Document Server Header",
+			Reason:   "Please specify document server header (Note: do not use 'Authorization' header)",
+		}
+	}
+
+	if err := c.validateFormats(); err != nil {
+		return err
+	}
+
+	return nil
+}

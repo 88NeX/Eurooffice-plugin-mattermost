@@ -1,0 +1,141 @@
+{
+  "private": true,
+  "scripts": {
+    "build": "webpack --mode=production",
+    "build:watch": "webpack --mode=production --watch",
+    "debug": "webpack --mode=none",
+    "debug:watch": "webpack --mode=development --watch",
+    "lint": "eslint --ignore-pattern node_modules --ignore-pattern dist --ext .js --ext .jsx --ext tsx --ext ts . --quiet --cache",
+    "fix": "eslint --ignore-pattern node_modules --ignore-pattern dist --ext .js --ext .jsx --ext tsx --ext ts . --quiet --fix --cache",
+    "test": "jest --forceExit --detectOpenHandles --verbose --passWithNoTests",
+    "test:coverage": "jest --forceExit --detectOpenHandles --coverage --passWithNoTests",
+    "test:watch": "jest --watch",
+    "test-ci": "jest --forceExit --detectOpenHandles --maxWorkers=2",
+    "check-types": "tsc"
+  },
+  "devDependencies": {
+    "@babel/cli": "7.29.7",
+    "@babel/core": "7.29.7",
+    "@babel/preset-env": "7.29.7",
+    "@babel/preset-react": "7.29.7",
+    "@babel/preset-typescript": "7.29.7",
+    "@babel/runtime": "7.29.7",
+    "@emotion/babel-preset-css-prop": "11.12.0",
+    "@emotion/core": "10.3.1",
+    "@emotion/react": "11.14.0",
+    "@mattermost/eslint-plugin": "1.1.0-0",
+    "@mattermost/types": "11.9.0",
+    "@testing-library/dom": "8.20.1",
+    "@testing-library/jest-dom": "6.9.1",
+    "@testing-library/react": "12.1.5",
+    "@testing-library/user-event": "14.6.7",
+    "@types/babel__core": "7.20.5",
+    "@types/babel__template": "7.4.4",
+    "@types/enzyme": "3.10.19",
+    "@types/jest": "30.0.0",
+    "@types/node": "24.12.4",
+    "@types/react": "17.0.83",
+    "@types/react-dom": "17.0.11",
+    "@types/react-redux": "7.1.34",
+    "@types/react-router-dom": "5.3.3",
+    "@types/react-transition-group": "4.4.12",
+    "@typescript-eslint/eslint-plugin": "8.69.0",
+    "@typescript-eslint/parser": "8.69.0",
+    "babel-loader": "10.1.1",
+    "babel-plugin-formatjs": "13.0.2",
+    "babel-plugin-typescript-to-proptypes": "2.1.0",
+    "css-loader": "7.1.5",
+    "enzyme": "3.11.0",
+    "enzyme-adapter-react-17-updated": "1.0.2",
+    "enzyme-to-json": "3.6.2",
+    "eslint-plugin-import": "2.32.0",
+    "eslint-plugin-react": "7.37.5",
+    "eslint-plugin-react-hooks": "4.6.2",
+    "file-loader": "6.2.0",
+    "identity-obj-proxy": "3.0.0",
+    "isomorphic-fetch": "3.0.0",
+    "jest": "30.5.1",
+    "jest-canvas-mock": "2.5.8",
+    "jest-environment-jsdom": "30.5.1",
+    "jest-junit": "17.0.0",
+    "sass": "1.103.1",
+    "sass-loader": "17.0.1",
+    "style-loader": "4.0.0",
+    "webpack": "5.110.3",
+    "webpack-cli": "5.1.4"
+  },
+  "overrides": {
+    "form-data": "^4.0.5",
+    "moment-timezone": "^0.5.48",
+    "nanoid": "^3.3.11",
+    "uuid": "^11.1.0"
+  },
+  "dependencies": {
+    "core-js": "3.50.0",
+    "mattermost-redux": "5.33.1",
+    "react": "17.0.2",
+    "react-bootstrap": "2.10.10",
+    "react-dom": "17.0.2",
+    "react-redux": "8.1.3",
+    "react-select": "5.10.2",
+    "redux": "4.2.0",
+    "typescript": "5.9.3"
+  },
+  "jest": {
+    "testEnvironment": "jsdom",
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/non_npm_dependencies/",
+      "/dist/"
+    ],
+    "clearMocks": true,
+    "collectCoverageFrom": [
+      "src/**/*.{js,jsx,ts,tsx}",
+      "!src/types/**",
+      "!src/index.tsx",
+      "!src/public/**",
+      "!src/components/**/index.ts",
+      "!src/redux/actions/index.ts"
+    ],
+    "coverageReporters": [
+      "lcov",
+      "text-summary",
+      "text"
+    ],
+    "moduleNameMapper": {
+      "^.+\\.(css|less|scss)$": "identity-obj-proxy",
+      "^.+\\.(jpg|jpeg|png|gif|eot|otf|webp|svg|ttf|woff|woff2|mp4|webm|wav|mp3|m4a|aac|oga)$": "<rootDir>/tests/fileMock.js",
+      "^bundle-loader\\?lazy\\!(.*)$": "$1"
+    },
+    "moduleDirectories": [
+      "src",
+      "node_modules"
+    ],
+    "moduleFileExtensions": [
+      "ts",
+      "tsx",
+      "js",
+      "jsx",
+      "json"
+    ],
+    "reporters": [
+      "default",
+      "jest-junit"
+    ],
+    "transform": {
+      "^.+\\.(js|jsx|ts|tsx)$": "babel-jest"
+    },
+    "transformIgnorePatterns": [
+      "node_modules/(?!react-native|react-router|mattermost-webapp|mattermost-redux)"
+    ],
+    "setupFiles": [
+      "jest-canvas-mock"
+    ],
+    "setupFilesAfterEnv": [
+      "<rootDir>/tests/setup.js"
+    ],
+    "testEnvironmentOptions": {
+      "url": "http://localhost:8065"
+    }
+  }
+}

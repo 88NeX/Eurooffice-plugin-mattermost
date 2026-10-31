@@ -1,0 +1,21 @@
+EuroOffice plugin for Mattermost
+================================
+
+This distribution is a modified version of the ONLYOFFICE app for Mattermost
+(https://github.com/ONLYOFFICE/onlyoffice-mattermost),
+Copyright (c) Ascensio System SIA, licensed under the Apache License, Version 2.0.
+
+Modifications made in 2026 by the 88NeX project:
+
+  - rebranded as "EuroOffice", plugin id 88nex.eurooffice;
+  - bot renamed from "onlyoffice" to "eurooffice", new icon;
+  - configuration JSON tags lowercased for compatibility with the Mattermost
+    admin console (which addresses plugin settings in lowercase);
+  - upstream marketplace screenshots removed from the bundle.
+
+This is an unofficial integration. "ONLYOFFICE" and "EuroOffice" are trademarks
+of their respective owners. This project is not affiliated with, sponsored by,
+or endorsed by Ascensio System SIA or the Euro-Office project.
+
+The EuroOffice DocumentServer itself is a separate program (AGPL-3.0) and is
+not included in this plugin bundle; the plugin communicates with it over HTTP.

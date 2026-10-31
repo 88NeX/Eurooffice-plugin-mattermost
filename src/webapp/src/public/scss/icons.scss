@@ -1,0 +1,99 @@
+/**
+ *
+ * (c) Copyright Ascensio System SIA 2026
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+.word{
+  background-image: url("../images/docx_icon.svg") !important;
+}
+
+.ppt{
+  background-image: url("../images/pptx_icon.svg") !important;
+}
+
+.excel{
+  background-image: url("../images/xlsx_icon.svg") !important;
+}
+
+$word-exts: doc, docm, docx, dot, dotm, dotx, epub, fb2, fodt, htm, html, hwp, hwpx, md, mht, mhtml, odt, ott, pages, rtf, stw, sxw, txt, wps, wpt, xml;
+@each $ext in $word-exts {
+  a[aria-label$='.#{$ext}'] .file-icon.word, a[aria-label$='.#{$ext}'] .file-icon.generic {
+    background-image: url("../images/docx_icon.svg") !important;
+  }
+
+  @if $ext == xml {
+    a[aria-label$='.xml'] .file-icon.code {
+      background-image: url("../images/docx_icon.svg") !important;
+    }
+  }
+
+  @if $ext == md {
+    a[aria-label$='.md'] .file-icon.code {
+      background-image: url("../images/docx_icon.svg") !important;
+    }
+  }
+
+  @if $ext == html {
+    a[aria-label$='.html'] .file-icon.code {
+      background-image: url("../images/docx_icon.svg") !important;
+    }
+  }
+
+  @if $ext == txt {
+    a[aria-label$='.txt'] .file-icon.text {
+      background-image: url("../images/docx_icon.svg") !important;
+    }
+  }
+
+  @if $ext == rtf {
+    a[aria-label$='.rtf'] .file-icon.text {
+      background-image: url("../images/docx_icon.svg") !important;
+    }
+  }
+}
+
+$cell-exts: csv, et, ett, fods, numbers, ods, ots, sxc, tsv, xls, xlsb, xlsm, xlsx, xlt, xltm, xltx;
+@each $ext in $cell-exts {
+  a[aria-label$='.#{$ext}'] .file-icon.excel, a[aria-label$='.#{$ext}'] .file-icon.generic {
+    background-image: url("../images/xlsx_icon.svg") !important;
+  }
+
+  @if $ext == tsv {
+    a[aria-label$='.tsv'] .file-icon.text, a[aria-label$='.tsv'] .file-icon.code {
+      background-image: url("../images/xlsx_icon.svg") !important;
+    }
+  }
+}
+
+$slide-exts: dps, dpt, fodp, key, odg, odp, otp, pot, potm, potx, pps, ppsm, ppsx, ppt, pptm, pptx, sxi;
+@each $ext in $slide-exts {
+  a[aria-label$='.#{$ext}'] .file-icon.ppt, a[aria-label$='.#{$ext}'] .file-icon.generic {
+    background-image: url("../images/pptx_icon.svg") !important;
+  }
+}
+
+$pdf-exts: djvu, docxf, oform, oxps, pdf, xps;
+@each $ext in $pdf-exts {
+  a[aria-label$='.#{$ext}'] .file-icon.pdf, a[aria-label$='.#{$ext}'] .file-icon.generic {
+    background-image: url("../images/pdf_icon.svg") !important;
+  }
+}
+
+$diagram-exts: vsdx, vsdm, vssm, vssx, vstm, vstx;
+@each $ext in $diagram-exts {
+  a[aria-label$='.#{$ext}'] .file-icon.diagram, a[aria-label$='.#{$ext}'] .file-icon.generic {
+    background-image: url("../images/diagram_icon.svg") !important;
+  }
+}
